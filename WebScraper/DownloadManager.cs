@@ -8,7 +8,6 @@
 
     public class DownloadManager
     {
-
         #region Fields
         
         private List<IEnumerable<string>> _enumerations;
@@ -24,17 +23,16 @@
         
         public DownloadManager(string path, string dynamicFormat, string directory, List<IEnumerable<string>> enumerators, int downloadPause, UpdateStatusHandler updateStatus)
         {
-            this._path = path;
-            this.formatString = dynamicFormat;
-            this._directory = directory;
-            this._enumerations = enumerators;
-            this._downloadPause = downloadPause;
-            this._updateStatus = updateStatus;
-            this.Enumerate(String.Empty, this.Download, 1);
+            _path = path;
+            formatString = dynamicFormat;
+            _directory = directory;
+            _enumerations = enumerators;
+            _downloadPause = downloadPause;
+            _updateStatus = updateStatus;
+            Enumerate(String.Empty, Download, 1);
         }
 
         #endregion
-
 
         private bool Enumerate(string currentStrings, HandleEnumerations handler, int itteration)
         {

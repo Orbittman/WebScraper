@@ -46,6 +46,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DownloadCollection.cs" />
     <Compile Include="DownloadManager.cs" />
     <Compile Include="NumericEnumerable.cs" />
     <Compile Include="NumericEnumerator.cs" />
