@@ -1,173 +1,153 @@
-﻿namespace WebScraper
+﻿// --------------------------------------------------------------------------------------------------------------------
+// <copyright file="DownloadManager.cs" company="Tim Barton">
+//   Tim Barton.
+// </copyright>
+// <summary>
+//   The download manager class.
+// </summary>
+// --------------------------------------------------------------------------------------------------------------------
+
+namespace WebScraper
 {
     using System;
     using System.Collections.Generic;
-    using System.IO;
-    using System.Net;
+    using System.Diagnostics;
+    using System.Linq;
     using System.Threading;
+    using System.Threading.Tasks;
 
+    /// <summary>
+    /// The download manager class.
+    /// </summary>
     public class DownloadManager
     {
         #region Fields
-        
-        private List<IEnumerable<string>> _enumerations;
-        private string _path;
-        private string _directory;
-        private string formatString;
-        private UpdateStatusHandler _updateStatus;
-        private int _downloadPause;
+
+        /// <summary>
+        /// The download collections.
+        /// </summary>
+        private readonly List<DownloadCollection> _collections;
+
+        /// <summary>
+        /// The processed item counter.
+        /// </summary>
+        private int _counter;
 
         #endregion
 
         #region Cosntructors
-        
-        public DownloadManager(string path, string dynamicFormat, string directory, List<IEnumerable<string>> enumerators, int downloadPause, UpdateStatusHandler updateStatus)
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DownloadManager"/> class.
+        /// </summary>
+        /// <param name="collections">
+        /// The collections.
+        /// </param>
+        public DownloadManager(List<DownloadCollection> collections)
         {
-            _path = path;
-            formatString = dynamicFormat;
-            _directory = directory;
-            _enumerations = enumerators;
-            _downloadPause = downloadPause;
-            _updateStatus = updateStatus;
-            Enumerate(String.Empty, Download, 1);
+            _collections = collections;
+            _collections = collections;
         }
 
         #endregion
 
-        private bool Enumerate(string currentStrings, HandleEnumerations handler, int itteration)
+        #region Properties
+
+        /// <summary>
+        /// Gets or sets the downloader to use for the downloading action.
+        /// </summary>
+        public IDownloader Downloader { get; set; }
+
+        /// <summary>
+        /// Gets or sets the logging action.
+        /// </summary>
+        public Action<string> LoggingAction { get; set; }
+
+        #endregion
+
+        #region Methods
+
+        /// <summary>
+        /// Start downloading the collections.
+        /// </summary>
+        public void StartDownloading()
         {
-            if (this._enumerations.Count >= itteration)
-            {
-                foreach (string value in this._enumerations[itteration - 1])
-                {
-                    if (!this.Enumerate(currentStrings + (currentStrings == String.Empty ? String.Empty : ",") + value, handler, itteration + 1))
-                    {
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                if (!handler(currentStrings.Split(',')))
-                {
-                    Console.WriteLine(currentStrings);
-                    return false;
-                }
+            if (Downloader == null)
+                        {
+                            throw new NullReferenceException("There was no downloader intitalised");
+                        }
 
-                if (this._downloadPause > 0)
-                {
-                    Console.WriteLine("Pausing {0}s", this._downloadPause);
-                    Thread.Sleep(this._downloadPause * 1000);
-                }
-            }
-
-            return true;
+            ProcessCollections();
         }
 
         /// <summary>
-        /// Starts the download
+        /// The log response invoker.
         /// </summary>
-        /// <param name="values">
-        /// The values to use to make the url
+        /// <param name="response">
+        /// The response.
         /// </param>
-        /// <returns>
-        /// Whether to continue or move to the next enumeration
-        /// </returns>
-        private bool Download(string[] values)
+        /// <param name="parameters">
+        /// The parameters.
+        /// </param>
+        private void InvokeResponse(string response, params object[] parameters)
         {
-            bool returnValue = false;
-            string file = String.Format(this.formatString, values);
-            string path = this._path + file;
-            var request = (HttpWebRequest)WebRequest.Create(path);
-            request.Credentials = new NetworkCredential("", "");
-
-                Stream reader = null;
-                FileStream fileStream = null;
-                try
-                {
-                    string downloadPath = this._directory + String.Format(this.formatString, values);
-                    int startPosition = this.FileLength(downloadPath);
-
-                    request.AddRange(startPosition);
-                    var response = (HttpWebResponse)request.GetResponse();
-                    if (response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.PartialContent)
-                    {
-                        Console.WriteLine(String.Format("Downloading {0} ({1} bytes)", file, response.ContentLength));
-                        reader = response.GetResponseStream();
-
-                        fileStream = new FileStream(downloadPath, FileMode.Append, FileAccess.Write, FileShare.None);
-
-                        if (reader != null)
-                        {
-                            // It will store the current number of bytes we retrieved from the server
-                            var bytesSize = 0;
-
-                            // A buffer for storing and writing the data retrieved from the server
-                            var downBuffer = new byte[2048];
-                            int offset = 0;
-                            Console.WriteLine();
-                            int totalSize = (int)fileStream.Length + (int)response.ContentLength;
-
-                            // Loop through the buffer until the buffer is empty
-                            while ((bytesSize = reader.Read(downBuffer, offset, downBuffer.Length)) > 0)
-                            {
-                                fileStream.Write(downBuffer, 0, bytesSize);
-                                this._updateStatus((int)fileStream.Length, totalSize);
-                                offset = 0;
-                            }
-
-                            Console.WriteLine();
-                            Console.WriteLine("Success: " + path);
-                            returnValue = true;
-                        }
-                    }
-                }
-                catch (IOException ex)
-                {
-                    Console.WriteLine("File error: " + path);
-                    Console.Write(ex.Message);
-                    returnValue = true;
-                }
-                catch (WebException ex)
-                {
-                    Console.WriteLine(String.Format("Skipping file: {0}", file));
-                    returnValue = ((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine("Failed: " + path);
-                    Console.Write(ex.Message);
-                    returnValue = false;
-                }
-                finally
-                {
-                    if (reader != null)
-                    {
-                        reader.Close();
-                    }
-
-                    if (fileStream != null)
-                    {
-                        fileStream.Close();
-                    }
-                }
-
-            return returnValue;
-        }
-
-        private int FileLength(string path)
-        {
-            try
+            if (LoggingAction != null)
             {
-                using(var file = new FileStream(path, FileMode.Open))
-                {
-                    return (int)file.Length;
-                }
-            }
-            catch(FileNotFoundException ex)
-            {
-                return 0;
+                LoggingAction(string.Format(response, parameters));
             }
         }
+
+        /// <summary>
+        /// The process collections method.
+        /// </summary>
+        private void ProcessCollections()
+        {
+            _counter = _collections.SelectMany(c => c).Count();
+            using (var semaphore = new SemaphoreSlim(5))
+            {
+                foreach (var collection in _collections)
+                {
+                    ProcessCollection(collection, semaphore);
+                }
+
+                while (_counter > 0)
+                {
+                }
+            }
+        }
+
+        /// <summary>
+        /// Process a <see cref="DownloadCollection"/>  collection.
+        /// </summary>
+        /// <param name="collection">
+        /// The collection to process
+        /// </param>
+        /// <param name="semaphore">The semaphore to limit the concurrent tasks</param>
+        private void ProcessCollection(DownloadCollection collection, SemaphoreSlim semaphore)
+        {
+            foreach (var downloadItem in collection)
+            {
+                string item = downloadItem;
+                Task.Factory.StartNew(
+                    async () =>
+                    {
+                        semaphore.Wait();
+                        Debug.WriteLine("Debugging");
+                        InvokeResponse("Downloading {0}", item);
+                        await Downloader.Download(collection, item);
+                        InvokeResponse("Releasing {0}", item);
+                        Interlocked.Decrement(ref this._counter);
+                        semaphore.Release();
+                    });
+
+                if (collection.Pause > 0)
+                {
+                    InvokeResponse("Waiting {0} seconds after {1}", collection.Pause, item);
+                    Thread.Sleep(collection.Pause * 1000);
+                }
+            }
+        }
+
+        #endregion
     }
 }

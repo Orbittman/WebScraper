@@ -47,7 +47,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DownloadCollection.cs" />
+    <Compile Include="DownloadCollectionEnumerator.cs" />
     <Compile Include="DownloadManager.cs" />
+    <Compile Include="FakeDownloader.cs" />
+    <Compile Include="HttpDownloader.cs" />
+    <Compile Include="IDownloader.cs" />
     <Compile Include="NumericEnumerable.cs" />
     <Compile Include="NumericEnumerator.cs" />
     <Compile Include="Program.cs" />

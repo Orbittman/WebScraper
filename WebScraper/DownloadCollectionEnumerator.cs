@@ -1,9 +1,9 @@
 ﻿// --------------------------------------------------------------------------------------------------------------------
-// <copyright file="NumericEnumerator.cs" company="Tim Barton">
+// <copyright file="DownloadCollectionEnumerator.cs" company="Tim Barton">
 //   Tim Barton.
 // </copyright>
 // <summary>
-//   The numeric enumerator.
+//   Defines the DownloadCollectionEnumerator type.
 // </summary>
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -11,43 +11,46 @@ namespace WebScraper
 {
     using System.Collections;
     using System.Collections.Generic;
+    using System.Linq;
 
     /// <summary>
-    /// The numeric enumerator.
+    /// The download collection enumerator.
     /// </summary>
-    public class NumericEnumerator
+    internal class DownloadCollectionEnumerator
         : IEnumerator<string>
     {
-        #region Fields
+        /// <summary>
+        /// The enumerations.
+        /// </summary>
+        private readonly IEnumerable<IEnumerator<string>> _enumerators;
 
         /// <summary>
-        /// The current count.
+        /// The format for the output
         /// </summary>
-        private int _count;
-
-        #endregion
-
-        #region Properties
+        private readonly string _format;
 
         /// <summary>
-        /// Gets or sets the limit for the enumeration
+        /// Initializes a new instance of the <see cref="DownloadCollectionEnumerator"/> class.
         /// </summary>
-        public int Max { get; set; }
-
-        #endregion
-
-        #region Implementation of IDisposable
-
+        /// <param name="enumerations">
+        /// The enumerations.
+        /// </param>
+        /// <param name="format">
+        /// The format for the output
+        /// </param>
+        public DownloadCollectionEnumerator(IEnumerable<IEnumerable<string>> enumerations, string format)
+        {
+            _enumerators = enumerations.Select(e => e.GetEnumerator()).ToList();
+            _format = format;
+        }
+        
         /// <summary>
         /// Gets the element in the collection at the current position of the enumerator.
         /// </summary>
         /// <returns>
         /// The element in the collection at the current position of the enumerator.
         /// </returns>
-        public string Current
-        {
-            get { return this._count.ToString("D2"); }
-        }
+        public string Current { get; private set; }
 
         /// <summary>
         /// Gets the current element in the collection.
@@ -55,10 +58,13 @@ namespace WebScraper
         /// <returns>
         /// The current element in the collection.
         /// </returns>
-        /// <exception cref="T:System.InvalidOperationException">The enumerator is positioned before the first element of the collection or after the last element.</exception><filterpriority>2</filterpriority>
+        /// <filterpriority>2</filterpriority>
         object IEnumerator.Current
         {
-            get { return this.Current; }
+            get
+            {
+                return Current;
+            }
         }
 
         /// <summary>
@@ -67,12 +73,7 @@ namespace WebScraper
         /// <filterpriority>2</filterpriority>
         public void Dispose()
         {
-            this._count = 0;
         }
-
-        #endregion
-
-        #region Implementation of IEnumerator
 
         /// <summary>
         /// Advances the enumerator to the next element of the collection.
@@ -83,10 +84,29 @@ namespace WebScraper
         /// <exception cref="T:System.InvalidOperationException">The collection was modified after the enumerator was created. </exception><filterpriority>2</filterpriority>
         public bool MoveNext()
         {
-            if (Max == 0 || _count < Max)
+            for (int i = _enumerators.Count() - 1; i >= 0; i--)
             {
-                this._count += 1;
-                return true;
+                if (_enumerators.ElementAt(i).MoveNext())
+                {
+                    var currentValues = _enumerators.Select(
+                        e =>
+                            {
+                                if (e.Current == null)
+                                {
+                                    e.MoveNext();
+                                }
+
+                                return e.Current as object;
+                            }).ToArray();
+
+                    Current = string.Format(_format, currentValues);
+                    return true;
+                }
+
+                foreach (var enumerator in _enumerators.Skip(i))
+                {
+                    enumerator.Reset();
+                }
             }
 
             return false;
@@ -98,9 +118,10 @@ namespace WebScraper
         /// <exception cref="T:System.InvalidOperationException">The collection was modified after the enumerator was created. </exception><filterpriority>2</filterpriority>
         public void Reset()
         {
-            this._count = 0;
+            foreach (var enumerator in _enumerators)
+            {
+                enumerator.Reset();
+            }
         }
-
-        #endregion
     }
 }
